@@ -63,7 +63,6 @@ class GoogleCalendarProvider(CalendarProvider):
             "timeMin": _iso(since),
             "timeMax": _iso(until),
             "singleEvents": "false",
-            "orderBy": "startTime",
             "maxResults": "2500",
         }
         events = []
