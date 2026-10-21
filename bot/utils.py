@@ -67,6 +67,18 @@ def local_now(timezone_name: str):
     return timezone.now().astimezone(ZoneInfo(timezone_name or "UTC"))
 
 
+def occurrence_passed(freq: str, time_val, weekdays, day_of_month, tz_name: str) -> bool:
+    """True, если текущее вхождение расписания уже прошло (время наступило)."""
+    local = local_now(tz_name)
+    if freq == "daily":
+        return bool(time_val and local.time() >= time_val)
+    if freq == "weekly":
+        return bool(time_val and weekdays and local.weekday() in weekdays and local.time() >= time_val)
+    if freq == "monthly":
+        return bool(time_val and day_of_month and local.day == day_of_month and local.time() >= time_val)
+    return False
+
+
 def format_reminder(r: Reminder, tz_name: str | None = None) -> str:
     """Человекочитаемое описание расписания напоминания."""
     tz_name = tz_name or r.user.timezone or "UTC"

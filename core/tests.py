@@ -1,6 +1,7 @@
 """Тесты: лимиты тарифов, логика due-check, конвертация часовых поясов."""
 
 from datetime import datetime, time, timedelta, timezone as dt_timezone
+from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
 from django.test import TestCase
@@ -121,3 +122,21 @@ class TimezoneTests(TestCase):
         utc = local.astimezone(dt_timezone.utc)
         self.assertEqual(utc.hour, 23)
         self.assertEqual(utc.day, 19)
+
+
+class OccurrenceTests(TestCase):
+    def test_occurrence_passed(self):
+        from bot import utils
+
+        # фиксируем «сейчас»: среда 20:50 по Москве
+        fixed = datetime(2026, 10, 21, 20, 50, tzinfo=ZoneInfo("Europe/Moscow"))
+        with patch.object(utils, "local_now", return_value=fixed):
+            # ежедневное в 20:30 — уже прошло
+            self.assertTrue(utils.occurrence_passed("daily", time(20, 30), None, None, "Europe/Moscow"))
+            # ежедневное в 21:00 — ещё не наступило
+            self.assertFalse(utils.occurrence_passed("daily", time(21, 0), None, None, "Europe/Moscow"))
+            # еженедельное в 14:25, сегодня выбранный день — прошло
+            self.assertTrue(utils.occurrence_passed("weekly", time(14, 25), [fixed.weekday()], None, "Europe/Moscow"))
+            # еженедельное в 14:25, завтра — не прошло
+            other = (fixed.weekday() + 1) % 7
+            self.assertFalse(utils.occurrence_passed("weekly", time(14, 25), [other], None, "Europe/Moscow"))

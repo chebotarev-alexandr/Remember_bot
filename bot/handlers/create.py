@@ -8,6 +8,7 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from asgiref.sync import sync_to_async
+from django.utils import timezone
 
 from bot.handlers.common import try_edit
 from bot.keyboards.calendar import calendar_keyboard
@@ -22,7 +23,7 @@ from bot.keyboards.main import (
 from bot.keyboards.time_picker import hours_keyboard, minutes_keyboard
 from bot.limits import acheck_limits
 from bot.states import CreateReminder
-from bot.utils import WEEKDAY_NAMES, local_now
+from bot.utils import WEEKDAY_NAMES, local_now, occurrence_passed
 from core.models import Reminder, TelegramUser
 
 router = Router()
@@ -280,14 +281,16 @@ def _update_reminder(pk: int, data: dict):
         r.time = None
         r.weekdays = []
         r.day_of_month = None
+        r.last_sent_at = None
     else:
         r.kind = data["freq"]
         r.time = dt_time(hour=hour, minute=minute)
         r.remind_at = None
         r.weekdays = data.get("weekdays")
         r.day_of_month = data.get("day_of_month")
+        skip = occurrence_passed(r.kind, r.time, r.weekdays, r.day_of_month, r.user.timezone)
+        r.last_sent_at = timezone.now() if skip else None
 
-    r.last_sent_at = None  # сброс — сработает по новому расписанию
     r.is_active = True
     r.save()
 
@@ -310,17 +313,22 @@ def _create_reminder(user_pk: int, data: dict):
 
     t = dt_time(hour=hour, minute=minute)
     freq = data["freq"]
+    weekdays = data.get("weekdays", []) if freq == "weekly" else None
+    dom = data.get("day_of_month") if freq == "monthly" else None
+    skip_today = occurrence_passed(freq, t, weekdays, dom, user.timezone)
+    last_sent = timezone.now() if skip_today else None
+
     if freq == "weekly":
         Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
-            weekdays=data.get("weekdays", []),
+            weekdays=weekdays, last_sent_at=last_sent,
         )
     elif freq == "monthly":
         Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.MONTHLY, time=t,
-            day_of_month=data.get("day_of_month", 1),
+            day_of_month=dom, last_sent_at=last_sent,
         )
     else:
         Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.DAILY, time=t,
+            user=user, text=text, kind=Reminder.Kind.DAILY, time=t, last_sent_at=last_sent,
         )
