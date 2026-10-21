@@ -9,6 +9,7 @@ data/
 venv/
 .env
 .env.*
+!.env.example
 /staticfiles/
 /media/
 .idea/
