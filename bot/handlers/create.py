@@ -24,6 +24,7 @@ from bot.keyboards.time_picker import hours_keyboard, minutes_keyboard
 from bot.limits import acheck_limits
 from bot.states import CreateReminder
 from bot.utils import WEEKDAY_NAMES, local_now, occurrence_passed
+from calendar_sync.sync import schedule_push
 from core.models import MAX_REMINDER_TEXT_LENGTH, Reminder, TelegramUser
 
 router = Router()
@@ -223,9 +224,11 @@ async def confirm_yes(callback: CallbackQuery, state: FSMContext, db_user: Teleg
     is_edit = "edit_id" in data
     if is_edit:
         await _update_reminder(data["edit_id"], data)
+        pk = data["edit_id"]
     else:
-        await _create_reminder(db_user.pk, data)
+        pk = await _create_reminder(db_user.pk, data)
     await state.clear()
+    await schedule_push(pk)
     await callback.message.edit_text(
         "✅ Готово! Напоминание обновлено." if is_edit else "✅ Готово! Напоминание создано."
     )
@@ -307,11 +310,11 @@ def _create_reminder(user_pk: int, data: dict):
     if data.get("kind") == "once":
         local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
         aware = local.replace(tzinfo=ZoneInfo(user.timezone or "UTC"))
-        Reminder.objects.create(
+        r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.ONCE,
             remind_at=aware.astimezone(dt_timezone.utc),
         )
-        return
+        return r.pk
 
     t = dt_time(hour=hour, minute=minute)
     freq = data["freq"]
@@ -321,16 +324,17 @@ def _create_reminder(user_pk: int, data: dict):
     last_sent = timezone.now() if skip_today else None
 
     if freq == "weekly":
-        Reminder.objects.create(
+        r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
             weekdays=weekdays, last_sent_at=last_sent,
         )
     elif freq == "monthly":
-        Reminder.objects.create(
+        r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.MONTHLY, time=t,
             day_of_month=dom, last_sent_at=last_sent,
         )
     else:
-        Reminder.objects.create(
+        r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.DAILY, time=t, last_sent_at=last_sent,
         )
+    return r.pk

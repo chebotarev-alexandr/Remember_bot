@@ -5,8 +5,8 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 MAIN_MENU = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="➕ Новое напоминание"), KeyboardButton(text="📋 Мои напоминания")],
-        [KeyboardButton(text="🌍 Часовой пояс"), KeyboardButton(text="⭐ Премиум")],
-        [KeyboardButton(text="ℹ️ Помощь")],
+        [KeyboardButton(text="🌍 Часовой пояс"), KeyboardButton(text="📅 Календари")],
+        [KeyboardButton(text="⭐ Премиум"), KeyboardButton(text="ℹ️ Помощь")],
     ],
     resize_keyboard=True,
 )

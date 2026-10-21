@@ -2,3 +2,5 @@ aiogram>=3.7,<4
 Django>=5.0,<6
 gunicorn>=22,<24
 whitenoise>=6.7,<7
+requests>=2.31,<3
+caldav>=3.0,<4

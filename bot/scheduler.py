@@ -97,3 +97,19 @@ async def scheduler_loop(bot):
             await check_due_reminders(bot)
         except Exception:  # noqa: BLE001
             logger.exception("Ошибка в планировщике")
+
+
+async def calendar_sync_loop():
+    """Фоновая синхронизация календарей (calendar -> bot)."""
+    from django.conf import settings
+
+    from calendar_sync.sync import _pull_all
+
+    interval = int(getattr(settings, "CALENDAR_SYNC_INTERVAL_SECONDS", 300))
+    logger.info("Синхронизация календарей запущена (интервал %s с)", interval)
+    while True:
+        await asyncio.sleep(interval)
+        try:
+            await _pull_all()
+        except Exception:  # noqa: BLE001
+            logger.exception("Ошибка синхронизации календарей")

@@ -7,6 +7,7 @@ from asgiref.sync import sync_to_async
 
 from bot.keyboards.main import MAIN_MENU, TYPE_KB
 from bot.states import CreateReminder, EditReminder
+from calendar_sync.sync import schedule_push
 from core.models import MAX_REMINDER_TEXT_LENGTH, Reminder
 
 router = Router()
@@ -47,6 +48,7 @@ async def edit_text_input(message: Message, state: FSMContext):
         return
     data = await state.get_data()
     await _update_text(data["edit_id"], text)
+    await schedule_push(data["edit_id"])
     await state.clear()
     await message.answer("✅ Текст обновлён.", reply_markup=MAIN_MENU)
 

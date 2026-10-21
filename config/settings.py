@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "core",
+    "calendar_sync",
 ]
 
 MIDDLEWARE = [
@@ -89,3 +90,10 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 # Лимиты бесплатного тарифа
 FREE_REGULAR_LIMIT = int(os.environ.get("FREE_REGULAR_LIMIT", "10"))
 FREE_ONCE_LIMIT = int(os.environ.get("FREE_ONCE_LIMIT", "3"))
+
+# ---- Календари ----
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:1")
+CALENDAR_EVENT_DURATION_MINUTES = int(os.environ.get("CALENDAR_EVENT_DURATION_MINUTES", "30"))
+CALENDAR_SYNC_INTERVAL_SECONDS = int(os.environ.get("CALENDAR_SYNC_INTERVAL_SECONDS", "300"))

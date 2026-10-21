@@ -23,9 +23,10 @@ class Command(BaseCommand):
 
     async def _run(self):
         from bot.dispatcher import build_dispatcher
-        from bot.scheduler import scheduler_loop
+        from bot.scheduler import calendar_sync_loop, scheduler_loop
 
         dp, bot = build_dispatcher()
         asyncio.create_task(scheduler_loop(bot))
+        asyncio.create_task(calendar_sync_loop())
         self.stdout.write("✅ Бот запущен. Ctrl+C для остановки.")
         await dp.start_polling(bot)

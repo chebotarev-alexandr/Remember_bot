@@ -9,6 +9,7 @@ from asgiref.sync import sync_to_async
 
 from bot.handlers.common import try_edit
 from bot.utils import format_reminder
+from calendar_sync.sync import schedule_push
 from core.models import Reminder, TelegramUser
 
 router = Router()
@@ -153,6 +154,7 @@ async def toggle_reminder(callback: CallbackQuery):
 async def delete_reminder(callback: CallbackQuery, db_user: TelegramUser):
     pk = int(callback.data.split(":")[1])
     await _delete(pk)
+    await schedule_push(pk)
     await callback.answer("🗑 Удалено")
     text, kb = await _render(db_user.pk, 0)
     await try_edit(callback.message, text, kb)
