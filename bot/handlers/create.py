@@ -50,12 +50,14 @@ async def reminder_text(message: Message, state: FSMContext):
 # ---- выбор типа ----
 @router.callback_query(CreateReminder.type, F.data == "type:once")
 async def type_once(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
-    ok, msg = await acheck_limits(db_user, Reminder.Kind.ONCE)
-    if not ok:
-        await callback.message.edit_text(msg)
-        await state.clear()
-        await callback.answer()
-        return
+    data = await state.get_data()
+    if "edit_id" not in data:
+        ok, msg = await acheck_limits(db_user, Reminder.Kind.ONCE)
+        if not ok:
+            await callback.message.edit_text(msg)
+            await state.clear()
+            await callback.answer()
+            return
     await state.update_data(kind="once")
     await state.set_state(CreateReminder.date)
     today = local_now(db_user.timezone).date()
@@ -144,12 +146,14 @@ async def back_to_type(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(CreateReminder.frequency, F.data.startswith("freq:"))
 async def pick_freq(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
     freq = callback.data.split(":")[1]
-    ok, msg = await acheck_limits(db_user, freq)
-    if not ok:
-        await callback.message.edit_text(msg)
-        await state.clear()
-        await callback.answer()
-        return
+    data = await state.get_data()
+    if "edit_id" not in data:
+        ok, msg = await acheck_limits(db_user, freq)
+        if not ok:
+            await callback.message.edit_text(msg)
+            await state.clear()
+            await callback.answer()
+            return
     await state.update_data(freq=freq)
     if freq == "weekly":
         await state.set_state(CreateReminder.weekday)
@@ -185,9 +189,15 @@ async def pick_dom(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(CreateReminder.confirm, F.data == "confirm:yes")
 async def confirm_yes(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
     data = await state.get_data()
-    await _create_reminder(db_user.pk, data)
+    is_edit = "edit_id" in data
+    if is_edit:
+        await _update_reminder(data["edit_id"], data)
+    else:
+        await _create_reminder(db_user.pk, data)
     await state.clear()
-    await callback.message.edit_text("✅ Готово! Напоминание создано.")
+    await callback.message.edit_text(
+        "✅ Готово! Напоминание обновлено." if is_edit else "✅ Готово! Напоминание создано."
+    )
     await callback.message.answer("Что дальше?", reply_markup=MAIN_MENU)
     await callback.answer()
 
@@ -224,6 +234,33 @@ def _summary(data: dict) -> str:
     else:
         sched = f"🔁 Ежемесячно ({data.get('day_of_month')}-го) в {h:02d}:{m:02d}"
     return f"{sched}\n📝 {text}"
+
+
+@sync_to_async
+def _update_reminder(pk: int, data: dict):
+    """Обновляет расписание напоминания (при редактировании)."""
+    r = Reminder.objects.select_related("user").get(pk=pk)
+    hour = data.get("hour", 0)
+    minute = data.get("minute", 0)
+
+    if data.get("kind") == "once":
+        local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
+        aware = local.replace(tzinfo=ZoneInfo(r.user.timezone or "UTC"))
+        r.kind = Reminder.Kind.ONCE
+        r.remind_at = aware.astimezone(dt_timezone.utc)
+        r.time = None
+        r.weekday = None
+        r.day_of_month = None
+    else:
+        r.kind = data["freq"]
+        r.time = dt_time(hour=hour, minute=minute)
+        r.remind_at = None
+        r.weekday = data.get("weekday")
+        r.day_of_month = data.get("day_of_month")
+
+    r.last_sent_at = None  # сброс — сработает по новому расписанию
+    r.is_active = True
+    r.save()
 
 
 @sync_to_async

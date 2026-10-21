@@ -105,6 +105,7 @@ async def rem_detail(callback: CallbackQuery):
                     callback_data=f"toggle:{r.pk}",
                 )
             ],
+            [InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"editmenu:{r.pk}")],
             [InlineKeyboardButton(text="🗑 Удалить", callback_data=f"del:{r.pk}")],
             [InlineKeyboardButton(text="◀ Назад", callback_data="back:list")],
         ]
@@ -132,6 +133,7 @@ async def toggle_reminder(callback: CallbackQuery):
                     callback_data=f"toggle:{r.pk}",
                 )
             ],
+            [InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"editmenu:{r.pk}")],
             [InlineKeyboardButton(text="🗑 Удалить", callback_data=f"del:{r.pk}")],
             [InlineKeyboardButton(text="◀ Назад", callback_data="back:list")],
         ]

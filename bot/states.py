@@ -17,3 +17,7 @@ class CreateReminder(StatesGroup):
 
 class SetTimezone(StatesGroup):
     choose = State()
+
+
+class EditReminder(StatesGroup):
+    text = State()
