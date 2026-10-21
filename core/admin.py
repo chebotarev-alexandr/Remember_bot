@@ -54,7 +54,7 @@ class ReminderAdmin(admin.ModelAdmin):
         "kind",
         "remind_at",
         "time",
-        "weekday",
+        "weekdays",
         "day_of_month",
         "is_active",
         "created_at",

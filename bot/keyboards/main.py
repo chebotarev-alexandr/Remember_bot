@@ -30,15 +30,21 @@ FREQUENCY_KB = InlineKeyboardMarkup(
 )
 
 
-def weekday_keyboard():
+def weekday_keyboard(selected: set[int] | None = None):
     from bot.utils import WEEKDAY_NAMES
 
+    selected = selected or set()
     row = [
-        InlineKeyboardButton(text=name, callback_data=f"wd:{i}") for i, name in enumerate(WEEKDAY_NAMES)
+        InlineKeyboardButton(
+            text=("✅ " + name) if i in selected else name,
+            callback_data=f"wd:toggle:{i}",
+        )
+        for i, name in enumerate(WEEKDAY_NAMES)
     ]
     return InlineKeyboardMarkup(
         inline_keyboard=[
             row,
+            [InlineKeyboardButton(text="✅ Готово", callback_data="wd:done")],
             [InlineKeyboardButton(text="◀ Назад", callback_data="back:freq")],
             [InlineKeyboardButton(text="❌ Отмена", callback_data="cancel")],
         ]

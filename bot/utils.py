@@ -75,8 +75,9 @@ def format_reminder(r: Reminder, tz_name: str | None = None) -> str:
         return f"⏰ {local:%d.%m.%Y %H:%M}"
     if r.kind == Reminder.Kind.DAILY and r.time:
         return f"🔁 Ежедневно в {r.time:%H:%M}"
-    if r.kind == Reminder.Kind.WEEKLY and r.time and r.weekday is not None:
-        return f"🔁 Еженедельно ({WEEKDAY_NAMES[r.weekday]}) в {r.time:%H:%M}"
+    if r.kind == Reminder.Kind.WEEKLY and r.time and r.weekdays:
+        days = ", ".join(WEEKDAY_NAMES[d] for d in sorted(r.weekdays))
+        return f"🔁 Еженедельно ({days}) в {r.time:%H:%M}"
     if r.kind == Reminder.Kind.MONTHLY and r.time and r.day_of_month:
         return f"🔁 Ежемесячно ({r.day_of_month}-го) в {r.time:%H:%M}"
     return r.get_kind_display()

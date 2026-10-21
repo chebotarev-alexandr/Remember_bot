@@ -143,6 +143,13 @@ async def back_to_type(callback: CallbackQuery, state: FSMContext):
     await callback.answer()
 
 
+@router.callback_query(F.data == "back:freq")
+async def back_to_freq(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(CreateReminder.frequency)
+    await callback.message.edit_text("🔁 Как часто напоминать?", reply_markup=FREQUENCY_KB)
+    await callback.answer()
+
+
 @router.callback_query(CreateReminder.frequency, F.data.startswith("freq:"))
 async def pick_freq(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
     freq = callback.data.split(":")[1]
@@ -156,8 +163,11 @@ async def pick_freq(callback: CallbackQuery, state: FSMContext, db_user: Telegra
             return
     await state.update_data(freq=freq)
     if freq == "weekly":
+        await state.update_data(weekdays=[])
         await state.set_state(CreateReminder.weekday)
-        await callback.message.edit_text("📆 Выбери день недели:", reply_markup=weekday_keyboard())
+        await callback.message.edit_text(
+            "📆 Выбери дни недели (можно несколько):", reply_markup=weekday_keyboard()
+        )
     elif freq == "monthly":
         await state.set_state(CreateReminder.day_of_month)
         await callback.message.edit_text("🗓 Выбери число месяца:", reply_markup=day_of_month_keyboard())
@@ -167,10 +177,28 @@ async def pick_freq(callback: CallbackQuery, state: FSMContext, db_user: Telegra
     await callback.answer()
 
 
-@router.callback_query(CreateReminder.weekday, F.data.startswith("wd:"))
-async def pick_weekday(callback: CallbackQuery, state: FSMContext):
-    wd = int(callback.data.split(":")[1])
-    await state.update_data(weekday=wd)
+@router.callback_query(CreateReminder.weekday, F.data.startswith("wd:toggle:"))
+async def toggle_weekday(callback: CallbackQuery, state: FSMContext):
+    day = int(callback.data.split(":")[2])
+    data = await state.get_data()
+    selected = set(data.get("weekdays", []))
+    if day in selected:
+        selected.discard(day)
+    else:
+        selected.add(day)
+    await state.update_data(weekdays=sorted(selected))
+    await callback.message.edit_text(
+        "📆 Выбери дни недели (можно несколько):", reply_markup=weekday_keyboard(selected)
+    )
+    await callback.answer()
+
+
+@router.callback_query(CreateReminder.weekday, F.data == "wd:done")
+async def weekday_done(callback: CallbackQuery, state: FSMContext):
+    data = await state.get_data()
+    if not data.get("weekdays"):
+        await callback.answer("Выбери хотя бы один день", show_alert=True)
+        return
     await state.set_state(CreateReminder.hour)
     await callback.message.edit_text("🕐 Выбери час:", reply_markup=hours_keyboard())
     await callback.answer()
@@ -230,7 +258,8 @@ def _summary(data: dict) -> str:
     if freq == "daily":
         sched = f"🔁 Ежедневно в {h:02d}:{m:02d}"
     elif freq == "weekly":
-        sched = f"🔁 Еженедельно ({WEEKDAY_NAMES[data.get('weekday', 0)]}) в {h:02d}:{m:02d}"
+        days = ", ".join(WEEKDAY_NAMES[d] for d in sorted(data.get("weekdays", [])))
+        sched = f"🔁 Еженедельно ({days}) в {h:02d}:{m:02d}"
     else:
         sched = f"🔁 Ежемесячно ({data.get('day_of_month')}-го) в {h:02d}:{m:02d}"
     return f"{sched}\n📝 {text}"
@@ -249,13 +278,13 @@ def _update_reminder(pk: int, data: dict):
         r.kind = Reminder.Kind.ONCE
         r.remind_at = aware.astimezone(dt_timezone.utc)
         r.time = None
-        r.weekday = None
+        r.weekdays = []
         r.day_of_month = None
     else:
         r.kind = data["freq"]
         r.time = dt_time(hour=hour, minute=minute)
         r.remind_at = None
-        r.weekday = data.get("weekday")
+        r.weekdays = data.get("weekdays")
         r.day_of_month = data.get("day_of_month")
 
     r.last_sent_at = None  # сброс — сработает по новому расписанию
@@ -284,7 +313,7 @@ def _create_reminder(user_pk: int, data: dict):
     if freq == "weekly":
         Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
-            weekday=data.get("weekday", 0),
+            weekdays=data.get("weekdays", []),
         )
     elif freq == "monthly":
         Reminder.objects.create(

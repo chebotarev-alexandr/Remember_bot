@@ -32,8 +32,8 @@ def is_due(r: Reminder, now) -> bool:
     if r.kind == Reminder.Kind.WEEKLY:
         return bool(
             r.time
-            and r.weekday is not None
-            and local.weekday() == r.weekday
+            and r.weekdays
+            and local.weekday() in r.weekdays
             and local.time() >= r.time
             and last_date != local.date()
         )

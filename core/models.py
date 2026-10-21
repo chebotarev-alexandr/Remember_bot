@@ -40,8 +40,8 @@ class Reminder(models.Model):
     remind_at = models.DateTimeField("Напомнить в", null=True, blank=True)
     # Регулярное — локальное время дня (в поясе пользователя)
     time = models.TimeField("Время", null=True, blank=True)
-    # Еженедельное — день недели (0=пн .. 6=вс)
-    weekday = models.PositiveSmallIntegerField("День недели", null=True, blank=True)
+    # Еженедельное — дни недели (список 0=пн .. 6=вс)
+    weekdays = models.JSONField("Дни недели", default=list, blank=True)
     # Ежемесячное — число месяца (1-31)
     day_of_month = models.PositiveSmallIntegerField("Число месяца", null=True, blank=True)
 

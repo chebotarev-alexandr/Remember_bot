@@ -85,7 +85,7 @@ class DueCheckTests(TestCase):
         local_now = timezone.now().astimezone(ZoneInfo("Europe/Moscow"))
         r = Reminder.objects.create(
             user=self.user, text="t", kind=Reminder.Kind.WEEKLY, time=time(0, 0),
-            weekday=local_now.weekday(),
+            weekdays=[local_now.weekday()],
         )
         self.assertTrue(is_due(r, timezone.now()))
 
@@ -93,7 +93,7 @@ class DueCheckTests(TestCase):
         local_now = timezone.now().astimezone(ZoneInfo("Europe/Moscow"))
         other = (local_now.weekday() + 1) % 7
         r = Reminder.objects.create(
-            user=self.user, text="t", kind=Reminder.Kind.WEEKLY, time=time(0, 0), weekday=other,
+            user=self.user, text="t", kind=Reminder.Kind.WEEKLY, time=time(0, 0), weekdays=[other],
         )
         self.assertFalse(is_due(r, timezone.now()))
 
