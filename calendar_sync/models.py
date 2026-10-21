@@ -56,3 +56,22 @@ class ReminderEventLink(models.Model):
 
     def __str__(self):
         return f"{self.connection.provider}:{self.external_event_id}"
+
+
+class PendingOAuth(models.Model):
+    """Ожидающая OAuth-авторизация (state → пользователь)."""
+
+    state = models.CharField("State", max_length=128, unique=True)
+    user = models.ForeignKey(
+        TelegramUser, on_delete=models.CASCADE, related_name="pending_oauth", verbose_name="Пользователь"
+    )
+    provider = models.CharField("Провайдер", max_length=10)
+    code_verifier = models.CharField("PKCE verifier", max_length=256, blank=True)
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Ожидающая OAuth-авторизация"
+        verbose_name_plural = "Ожидающие OAuth-авторизации"
+
+    def __str__(self):
+        return f"{self.provider}:{self.state}"

@@ -21,12 +21,3 @@ class SetTimezone(StatesGroup):
 
 class EditReminder(StatesGroup):
     text = State()
-
-
-class ConnectGoogle(StatesGroup):
-    waiting_code = State()
-
-
-class ConnectYandex(StatesGroup):
-    username = State()
-    password = State()

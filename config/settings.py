@@ -94,6 +94,13 @@ FREE_ONCE_LIMIT = int(os.environ.get("FREE_ONCE_LIMIT", "3"))
 # ---- Календари ----
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
-GOOGLE_OAUTH_REDIRECT_URI = os.environ.get("GOOGLE_OAUTH_REDIRECT_URI", "http://localhost:1")
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get(
+    "GOOGLE_OAUTH_REDIRECT_URI", "https://bot.code-orbit.ru/callback/google/"
+)
+YANDEX_OAUTH_CLIENT_ID = os.environ.get("YANDEX_OAUTH_CLIENT_ID", "")
+YANDEX_OAUTH_CLIENT_SECRET = os.environ.get("YANDEX_OAUTH_CLIENT_SECRET", "")
+YANDEX_OAUTH_REDIRECT_URI = os.environ.get(
+    "YANDEX_OAUTH_REDIRECT_URI", "https://bot.code-orbit.ru/callback/yandex/"
+)
 CALENDAR_EVENT_DURATION_MINUTES = int(os.environ.get("CALENDAR_EVENT_DURATION_MINUTES", "30"))
 CALENDAR_SYNC_INTERVAL_SECONDS = int(os.environ.get("CALENDAR_SYNC_INTERVAL_SECONDS", "300"))

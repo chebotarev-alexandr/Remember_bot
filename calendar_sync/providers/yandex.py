@@ -1,4 +1,4 @@
-"""Яндекс Календарь через CalDAV."""
+"""Яндекс Календарь через CalDAV (OAuth 2.0)."""
 
 import logging
 from datetime import datetime, timezone as dt_timezone
@@ -10,6 +10,17 @@ from .base import CalendarProvider
 logger = logging.getLogger(__name__)
 
 CALDAV_URL = "https://caldav.yandex.ru/"
+
+
+class _YandexOAuth:
+    """Шлёт заголовок Authorization: OAuth <token> (специфика Яндекса)."""
+
+    def __init__(self, token):
+        self.token = token
+
+    def __call__(self, r):
+        r.headers["Authorization"] = f"OAuth {self.token}"
+        return r
 
 
 def _to_aware(dt):
@@ -51,16 +62,14 @@ def _vrec_to_rrule_str(vrec) -> str:
 class YandexCalendarProvider(CalendarProvider):
     def __init__(self, connection):
         super().__init__(connection)
-        self.username = connection.credentials.get("username", "")
-        self.app_password = connection.credentials.get("app_password", "")
+        creds = connection.credentials or {}
+        self.access_token = creds.get("access_token") or creds.get("token", "")
         self._client = None
 
     @property
     def client(self):
         if self._client is None:
-            self._client = caldav.DAVClient(
-                url=CALDAV_URL, username=self.username, password=self.app_password
-            )
+            self._client = caldav.DAVClient(url=CALDAV_URL, auth=_YandexOAuth(self.access_token))
         return self._client
 
     def validate(self):
