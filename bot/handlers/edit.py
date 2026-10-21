@@ -7,7 +7,7 @@ from asgiref.sync import sync_to_async
 
 from bot.keyboards.main import MAIN_MENU, TYPE_KB
 from bot.states import CreateReminder, EditReminder
-from core.models import Reminder
+from core.models import MAX_REMINDER_TEXT_LENGTH, Reminder
 
 router = Router()
 
@@ -40,8 +40,10 @@ async def edit_text(callback: CallbackQuery, state: FSMContext):
 @router.message(EditReminder.text, F.text)
 async def edit_text_input(message: Message, state: FSMContext):
     text = message.text.strip()
-    if len(text) > 255:
-        await message.answer("⚠️ Слишком длинно (макс. 255 символов). Напиши короче:")
+    if len(text) > MAX_REMINDER_TEXT_LENGTH:
+        await message.answer(
+            f"⚠️ Слишком длинно (макс. {MAX_REMINDER_TEXT_LENGTH:,} символов). Напиши короче:"
+        )
         return
     data = await state.get_data()
     await _update_text(data["edit_id"], text)

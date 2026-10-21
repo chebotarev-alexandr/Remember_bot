@@ -2,6 +2,9 @@
 
 from django.db import models
 
+# Максимальная длина текста напоминания (1 млн символов)
+MAX_REMINDER_TEXT_LENGTH = 1_000_000
+
 
 class TelegramUser(models.Model):
     telegram_id = models.BigIntegerField("Telegram ID", unique=True)
@@ -33,7 +36,7 @@ class Reminder(models.Model):
     user = models.ForeignKey(
         TelegramUser, on_delete=models.CASCADE, related_name="reminders", verbose_name="Пользователь"
     )
-    text = models.CharField("Текст", max_length=255)
+    text = models.TextField("Текст")
     kind = models.CharField("Тип", max_length=10, choices=Kind.choices)
 
     # Однократное — точный момент (aware, UTC)

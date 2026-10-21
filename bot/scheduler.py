@@ -13,6 +13,7 @@ from core.models import Reminder
 logger = logging.getLogger(__name__)
 
 INTERVAL_SECONDS = 30
+TG_MAX_MESSAGE = 4096  # лимит Telegram на одно сообщение
 
 
 def is_due(r: Reminder, now) -> bool:
@@ -67,12 +68,21 @@ def _mark_sent(pk: int):
     r.save()
 
 
+async def _send_long_text(bot, chat_id: int, text: str) -> None:
+    """Отправляет текст, разбивая на части по лимиту Telegram (4096 символов)."""
+    escaped = escape(text)
+    chunks = [escaped[i : i + TG_MAX_MESSAGE] for i in range(0, len(escaped), TG_MAX_MESSAGE)]
+    for idx, chunk in enumerate(chunks):
+        msg = f"🔔 Напоминание:\n\n{chunk}" if idx == 0 else chunk
+        await bot.send_message(chat_id, msg)
+
+
 async def check_due_reminders(bot) -> int:
     """Отправляет просроченные напоминания. Возвращает число отправленных."""
     due = await _due_reminders()
     for r in due:
         try:
-            await bot.send_message(r.user.telegram_id, f"🔔 Напоминание:\n\n{escape(r.text)}")
+            await _send_long_text(bot, r.user.telegram_id, r.text)
         except Exception as exc:  # noqa: BLE001 — fail-silent, не роняем планировщик
             logger.warning("Ошибка отправки напоминания %s: %s", r.pk, exc)
         await _mark_sent(r.pk)

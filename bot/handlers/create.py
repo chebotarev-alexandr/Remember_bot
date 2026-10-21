@@ -24,7 +24,7 @@ from bot.keyboards.time_picker import hours_keyboard, minutes_keyboard
 from bot.limits import acheck_limits
 from bot.states import CreateReminder
 from bot.utils import WEEKDAY_NAMES, local_now, occurrence_passed
-from core.models import Reminder, TelegramUser
+from core.models import MAX_REMINDER_TEXT_LENGTH, Reminder, TelegramUser
 
 router = Router()
 
@@ -34,14 +34,16 @@ router = Router()
 async def new_reminder(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(CreateReminder.text)
-    await message.answer("✏️ О чём напомнить?\n\nНапиши текст (до 255 символов):")
+    await message.answer("✏️ О чём напомнить?\n\nНапиши текст:")
 
 
 @router.message(CreateReminder.text, F.text)
 async def reminder_text(message: Message, state: FSMContext):
     text = message.text.strip()
-    if len(text) > 255:
-        await message.answer("⚠️ Слишком длинно (макс. 255 символов). Напиши короче:")
+    if len(text) > MAX_REMINDER_TEXT_LENGTH:
+        await message.answer(
+            f"⚠️ Слишком длинно (макс. {MAX_REMINDER_TEXT_LENGTH:,} символов). Напиши короче:"
+        )
         return
     await state.update_data(text=text)
     await state.set_state(CreateReminder.type)
