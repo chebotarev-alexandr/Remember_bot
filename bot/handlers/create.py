@@ -8,7 +8,6 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 from asgiref.sync import sync_to_async
-from django.utils import timezone
 
 from bot.handlers.common import try_edit
 from bot.keyboards.calendar import calendar_keyboard
@@ -248,14 +247,14 @@ def _create_reminder(user_pk: int, data: dict):
     if freq == "weekly":
         Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
-            weekday=data.get("weekday", 0), last_sent_at=timezone.now(),
+            weekday=data.get("weekday", 0),
         )
     elif freq == "monthly":
         Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.MONTHLY, time=t,
-            day_of_month=data.get("day_of_month", 1), last_sent_at=timezone.now(),
+            day_of_month=data.get("day_of_month", 1),
         )
     else:
         Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.DAILY, time=t, last_sent_at=timezone.now(),
+            user=user, text=text, kind=Reminder.Kind.DAILY, time=t,
         )
