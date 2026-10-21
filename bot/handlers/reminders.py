@@ -24,12 +24,12 @@ async def list_reminders(message: Message, db_user: TelegramUser):
 
 @sync_to_async
 def _items(user_pk: int):
-    return list(Reminder.objects.filter(user_id=user_pk).order_by("created_at"))
+    return list(Reminder.objects.filter(user_id=user_pk).select_related("user").order_by("created_at"))
 
 
 @sync_to_async
 def _get(pk: int):
-    return Reminder.objects.get(pk=pk)
+    return Reminder.objects.select_related("user").get(pk=pk)
 
 
 @sync_to_async

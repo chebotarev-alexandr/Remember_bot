@@ -1,5 +1,6 @@
 """Лимиты бесплатного тарифа."""
 
+from asgiref.sync import sync_to_async
 from django.conf import settings
 
 from core.models import Reminder, TelegramUser
@@ -39,3 +40,8 @@ def limits_summary(user: TelegramUser) -> str:
         f"• Регулярные: {regular}/{settings.FREE_REGULAR_LIMIT}\n"
         f"• Однократные: {once}/{settings.FREE_ONCE_LIMIT}"
     )
+
+
+# async-обёртки для вызова из aiogram-обработчиков (ORM не работает в async-контексте)
+acheck_limits = sync_to_async(check_limits)
+alimits_summary = sync_to_async(limits_summary)

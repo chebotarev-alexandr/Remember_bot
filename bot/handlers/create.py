@@ -21,7 +21,7 @@ from bot.keyboards.main import (
     weekday_keyboard,
 )
 from bot.keyboards.time_picker import hours_keyboard, minutes_keyboard
-from bot.limits import check_limits
+from bot.limits import acheck_limits
 from bot.states import CreateReminder
 from bot.utils import WEEKDAY_NAMES, local_now
 from core.models import Reminder, TelegramUser
@@ -51,7 +51,7 @@ async def reminder_text(message: Message, state: FSMContext):
 # ---- выбор типа ----
 @router.callback_query(CreateReminder.type, F.data == "type:once")
 async def type_once(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
-    ok, msg = check_limits(db_user, Reminder.Kind.ONCE)
+    ok, msg = await acheck_limits(db_user, Reminder.Kind.ONCE)
     if not ok:
         await callback.message.edit_text(msg)
         await state.clear()
@@ -145,7 +145,7 @@ async def back_to_type(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(CreateReminder.frequency, F.data.startswith("freq:"))
 async def pick_freq(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
     freq = callback.data.split(":")[1]
-    ok, msg = check_limits(db_user, freq)
+    ok, msg = await acheck_limits(db_user, freq)
     if not ok:
         await callback.message.edit_text(msg)
         await state.clear()
