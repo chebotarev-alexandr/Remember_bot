@@ -16,7 +16,8 @@ def build_dispatcher():
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dp = Dispatcher(storage=MemoryStorage())
-    dp.update.middleware(UserMiddleware())
+    dp.message.middleware(UserMiddleware())
+    dp.callback_query.middleware(UserMiddleware())
 
     dp.include_router(start.router)
     dp.include_router(create.router)
