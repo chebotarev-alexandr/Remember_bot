@@ -57,9 +57,10 @@ class ReminderAdmin(admin.ModelAdmin):
         "weekdays",
         "day_of_month",
         "is_active",
+        "is_deleted",
         "created_at",
     )
-    list_filter = ("kind", "is_active")
+    list_filter = ("kind", "is_active", "is_deleted")
     search_fields = ("text", "user__username", "user__telegram_id")
     raw_id_fields = ("user",)
     autocomplete_fields = ("user",)

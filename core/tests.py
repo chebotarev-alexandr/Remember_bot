@@ -52,6 +52,12 @@ class LimitsTests(TestCase):
         ok, _ = check_limits(self.user, Reminder.Kind.DAILY)
         self.assertTrue(ok)
 
+    def test_deleted_not_counted(self):
+        for _ in range(10):
+            self._make(Reminder.Kind.DAILY, is_deleted=True)
+        ok, _ = check_limits(self.user, Reminder.Kind.DAILY)
+        self.assertTrue(ok)
+
 
 class DueCheckTests(TestCase):
     def setUp(self):
@@ -96,6 +102,14 @@ class DueCheckTests(TestCase):
         r = Reminder.objects.create(
             user=self.user, text="t", kind=Reminder.Kind.WEEKLY, time=time(0, 0), weekdays=[other],
         )
+        self.assertFalse(is_due(r, timezone.now()))
+
+    def test_deleted_reminder_not_due(self):
+        r = Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.DAILY, time=time(0, 0),
+        )
+        r.is_deleted = True
+        r.save()
         self.assertFalse(is_due(r, timezone.now()))
 
     def test_blocked_user_never_due(self):

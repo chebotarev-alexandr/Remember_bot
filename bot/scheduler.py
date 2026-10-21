@@ -17,7 +17,7 @@ INTERVAL_SECONDS = 30
 
 def is_due(r: Reminder, now) -> bool:
     """Пора ли отправить напоминание (чистая синхронная логика, тестируемая)."""
-    if not r.is_active or r.user.is_blocked:
+    if not r.is_active or r.is_deleted or r.user.is_blocked:
         return False
 
     tz = ZoneInfo(r.user.timezone or "UTC")
@@ -53,7 +53,7 @@ def _due_reminders():
     now = timezone.now()
     return [
         r
-        for r in Reminder.objects.filter(is_active=True).select_related("user")
+        for r in Reminder.objects.filter(is_active=True, is_deleted=False).select_related("user")
         if is_due(r, now)
     ]
 

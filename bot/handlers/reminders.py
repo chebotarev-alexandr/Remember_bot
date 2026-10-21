@@ -24,7 +24,11 @@ async def list_reminders(message: Message, db_user: TelegramUser):
 
 @sync_to_async
 def _items(user_pk: int):
-    return list(Reminder.objects.filter(user_id=user_pk).select_related("user").order_by("created_at"))
+    return list(
+        Reminder.objects.filter(user_id=user_pk, is_deleted=False)
+        .select_related("user")
+        .order_by("created_at")
+    )
 
 
 @sync_to_async
@@ -42,7 +46,7 @@ def _toggle(pk: int) -> bool:
 
 @sync_to_async
 def _delete(pk: int):
-    Reminder.objects.filter(pk=pk).delete()
+    Reminder.objects.filter(pk=pk).update(is_deleted=True)
 
 
 async def _render(user_pk: int, page: int):

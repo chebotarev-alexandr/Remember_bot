@@ -46,6 +46,7 @@ class Reminder(models.Model):
     day_of_month = models.PositiveSmallIntegerField("Число месяца", null=True, blank=True)
 
     is_active = models.BooleanField("Активно", default=True)
+    is_deleted = models.BooleanField("Удалено", default=False)
     last_sent_at = models.DateTimeField("Последняя отправка", null=True, blank=True)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
 

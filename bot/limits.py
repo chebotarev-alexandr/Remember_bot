@@ -12,11 +12,11 @@ def check_limits(user: TelegramUser, kind: str) -> tuple[bool, str]:
         return True, ""
 
     if kind == Reminder.Kind.ONCE:
-        count = user.reminders.filter(is_active=True, kind=Reminder.Kind.ONCE).count()
+        count = user.reminders.filter(is_active=True, is_deleted=False, kind=Reminder.Kind.ONCE).count()
         limit = settings.FREE_ONCE_LIMIT
         label = "однократных"
     else:
-        count = user.reminders.filter(is_active=True).exclude(kind=Reminder.Kind.ONCE).count()
+        count = user.reminders.filter(is_active=True, is_deleted=False).exclude(kind=Reminder.Kind.ONCE).count()
         limit = settings.FREE_REGULAR_LIMIT
         label = "регулярных"
 
@@ -33,8 +33,8 @@ def limits_summary(user: TelegramUser) -> str:
     """Краткая сводка лимитов для раздела «Премиум»."""
     if user.is_premium:
         return "⭐ У тебя премиум — ограничений нет."
-    regular = user.reminders.filter(is_active=True).exclude(kind=Reminder.Kind.ONCE).count()
-    once = user.reminders.filter(is_active=True, kind=Reminder.Kind.ONCE).count()
+    regular = user.reminders.filter(is_active=True, is_deleted=False).exclude(kind=Reminder.Kind.ONCE).count()
+    once = user.reminders.filter(is_active=True, is_deleted=False, kind=Reminder.Kind.ONCE).count()
     return (
         f"📊 Твой тариф: бесплатный\n"
         f"• Регулярные: {regular}/{settings.FREE_REGULAR_LIMIT}\n"
