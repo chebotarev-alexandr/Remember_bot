@@ -154,3 +154,34 @@ class OccurrenceTests(TestCase):
             # еженедельное в 14:25, завтра — не прошло
             other = (fixed.weekday() + 1) % 7
             self.assertFalse(utils.occurrence_passed("weekly", time(14, 25), [other], None, "Europe/Moscow"))
+
+
+class MyEventsApiTests(TestCase):
+    def setUp(self):
+        self.user = TelegramUser.objects.create(
+            telegram_id=401678632, timezone="Asia/Vladivostok", first_name="Александр"
+        )
+        other = TelegramUser.objects.create(telegram_id=999, timezone="UTC")
+        Reminder.objects.create(user=self.user, text="Вокал", kind=Reminder.Kind.WEEKLY, time=time(20, 30), weekdays=[2])
+        Reminder.objects.create(user=self.user, text="Купить чай", kind=Reminder.Kind.ONCE,
+                                remind_at=timezone.now() + timedelta(days=1))
+        Reminder.objects.create(user=other, text="Чужое", kind=Reminder.Kind.DAILY, time=time(9, 0))
+
+    def test_requires_token(self):
+        resp = self.client.get("/api/my-events/")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_returns_only_owner_events(self):
+        with self.settings(PLANNER_API_TOKEN="tok"):
+            resp = self.client.get("/api/my-events/", {"token": "tok"})
+        self.assertEqual(resp.status_code, 200)
+        data = resp.json()
+        self.assertEqual(data["count"], 2)
+        self.assertEqual(data["timezone"], "Asia/Vladivostok")
+        texts = {e["text"] for e in data["events"]}
+        self.assertEqual(texts, {"Вокал", "Купить чай"})
+
+    def test_bad_token_401(self):
+        with self.settings(PLANNER_API_TOKEN="tok"):
+            resp = self.client.get("/api/my-events/", {"token": "wrong"})
+        self.assertEqual(resp.status_code, 401)

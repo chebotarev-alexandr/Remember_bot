@@ -91,6 +91,11 @@ BOT_TOKEN = os.environ.get("BOT_TOKEN", "")
 FREE_REGULAR_LIMIT = int(os.environ.get("FREE_REGULAR_LIMIT", "10"))
 FREE_ONCE_LIMIT = int(os.environ.get("FREE_ONCE_LIMIT", "3"))
 
+# ---- Внешний API (e-ink панель и пр.) ----
+# Токен для доступа к /api/my-events/ и владелец, чьи события отдаём.
+PLANNER_API_TOKEN = os.environ.get("PLANNER_API_TOKEN", "")
+PLANNER_OWNER_TELEGRAM_ID = int(os.environ.get("PLANNER_OWNER_TELEGRAM_ID", "401678632"))
+
 # ---- Календари ----
 GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
 GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
