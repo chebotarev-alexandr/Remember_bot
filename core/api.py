@@ -53,9 +53,9 @@ def weather(request):
     if not _authed(request):
         return JsonResponse({"error": "unauthorized"}, status=401)
 
-    lat = request.GET.get("lat", "48.48")
-    lon = request.GET.get("lon", "135.07")
-    tz = request.GET.get("tz", "Asia/Vladivostok")
+    # Погода всегда для Хабаровска — координаты захардкожены, чтобы случайно
+    # не отдать погоду Амстердама (эта машина живёт в Амстердаме).
+    lat, lon, tz = "48.48", "135.07", "Asia/Vladivostok"
 
     url = (
         "https://api.open-meteo.com/v1/forecast"
