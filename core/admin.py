@@ -10,6 +10,7 @@ class TelegramUserAdmin(admin.ModelAdmin):
         "username",
         "first_name",
         "timezone",
+        "default_remind_before",
         "is_premium",
         "is_blocked",
         "created_at",
@@ -19,7 +20,10 @@ class TelegramUserAdmin(admin.ModelAdmin):
     list_editable = ("is_premium", "is_blocked")
     readonly_fields = ("telegram_id", "created_at", "updated_at")
     fieldsets = (
-        (None, {"fields": ("telegram_id", "username", "first_name", "last_name", "timezone")}),
+        (
+            None,
+            {"fields": ("telegram_id", "username", "first_name", "last_name", "timezone", "default_remind_before")},
+        ),
         ("Статус", {"fields": ("is_premium", "is_blocked")}),
         ("Служебное", {"fields": ("created_at", "updated_at")}),
     )
@@ -56,6 +60,7 @@ class ReminderAdmin(admin.ModelAdmin):
         "time",
         "weekdays",
         "day_of_month",
+        "remind_before",
         "is_active",
         "is_deleted",
         "created_at",

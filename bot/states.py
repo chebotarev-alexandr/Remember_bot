@@ -9,6 +9,7 @@ class CreateReminder(StatesGroup):
     date = State()  # для однократного — выбор даты
     hour = State()
     minute = State()
+    remind_before = State()  # за сколько предупредить (мин; None = по умолчанию)
     frequency = State()  # для регулярного — daily/weekly/monthly
     weekday = State()  # для weekly
     day_of_month = State()  # для monthly

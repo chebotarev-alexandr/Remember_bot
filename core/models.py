@@ -12,6 +12,9 @@ class TelegramUser(models.Model):
     first_name = models.CharField("Имя", max_length=64, blank=True)
     last_name = models.CharField("Фамилия", max_length=64, blank=True)
     timezone = models.CharField("Часовой пояс", max_length=64, default="UTC")
+    default_remind_before = models.PositiveSmallIntegerField(
+        "Напомнить заранее (мин, по умолчанию)", default=15
+    )
     is_premium = models.BooleanField("Премиум", default=False)
     is_blocked = models.BooleanField("Заблокирован", default=False)
     created_at = models.DateTimeField("Создан", auto_now_add=True)
@@ -48,15 +51,25 @@ class Reminder(models.Model):
     # Ежемесячное — число месяца (1-31)
     day_of_month = models.PositiveSmallIntegerField("Число месяца", null=True, blank=True)
 
+    # Предупреждение заранее: своё значение (мин) > глобальное юзера. None = по умолчанию.
+    remind_before = models.PositiveSmallIntegerField("Напомнить заранее (мин)", null=True, blank=True)
+
     is_active = models.BooleanField("Активно", default=True)
     is_deleted = models.BooleanField("Удалено", default=False)
     last_sent_at = models.DateTimeField("Последняя отправка", null=True, blank=True)
+    pre_sent_at = models.DateTimeField("Предупреждение отправлено", null=True, blank=True)
     created_at = models.DateTimeField("Создано", auto_now_add=True)
 
     class Meta:
         verbose_name = "Напоминание"
         verbose_name_plural = "Напоминания"
         ordering = ["created_at"]
+
+    def effective_remind_before(self) -> int:
+        """Эффективный интервал предупреждения: своё значение > глобальное юзера."""
+        if self.remind_before is not None:
+            return self.remind_before
+        return self.user.default_remind_before
 
     def __str__(self):
         return f"{self.get_kind_display()}: {self.text[:40]}"

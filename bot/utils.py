@@ -10,6 +10,27 @@ MONTH_NAMES = [
     "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь",
 ]
 
+# Предустановленные интервалы предупреждения (в минутах)
+PRESET_MINUTES = [5, 10, 15, 30, 60, 120, 1440]
+
+
+def humanize_minutes(n: int | None) -> str:
+    """Человекочитаемый интервал: 0 → 'не напоминать', 60 → '1 час', 1440 → '1 день'."""
+    if n is None or n <= 0:
+        return "не напоминать заранее"
+    if n < 60:
+        return f"{n} мин"
+    hours, minutes = divmod(n, 60)
+    if minutes == 0:
+        if hours == 1:
+            return "1 час"
+        if hours == 24:
+            return "1 день"
+        return f"{hours} ч"
+    if hours == 1:
+        return f"1 ч {minutes} мин"
+    return f"{hours} ч {minutes} мин"
+
 # Курируемый список популярных часовых поясов (IANA name → подпись)
 COMMON_TIMEZONES = [
     ("Europe/Moscow", "🇷🇺 Москва (UTC+3)"),

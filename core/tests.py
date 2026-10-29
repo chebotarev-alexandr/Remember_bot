@@ -8,7 +8,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from bot.limits import check_limits
-from bot.scheduler import is_due
+from bot.scheduler import is_due, is_pre_due
+from bot.utils import humanize_minutes
 from core.models import Reminder, TelegramUser
 
 
@@ -185,3 +186,138 @@ class MyEventsApiTests(TestCase):
         with self.settings(PLANNER_API_TOKEN="tok"):
             resp = self.client.get("/api/my-events/", {"token": "wrong"})
         self.assertEqual(resp.status_code, 401)
+
+
+class PreDueTests(TestCase):
+    """Предупреждение заранее (первое напоминание за N минут до)."""
+
+    def setUp(self):
+        self.user = TelegramUser.objects.create(telegram_id=1, timezone="UTC")
+
+    def _once(self, remind_at, **kw):
+        return Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.ONCE, remind_at=remind_at, **kw
+        )
+
+    def _daily(self, t, **kw):
+        return Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.DAILY, time=t, **kw
+        )
+
+    # ---- однократное ----
+    def test_once_within_window(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=dt_timezone.utc)
+        self.assertTrue(is_pre_due(self._once(now + timedelta(minutes=10)), now, 15))
+
+    def test_once_before_window(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._once(now + timedelta(minutes=30)), now, 15))
+
+    def test_once_at_or_past_time_not_pre_due(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._once(now - timedelta(minutes=1)), now, 15))
+
+    def test_once_already_pre_sent(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=dt_timezone.utc)
+        r = self._once(now + timedelta(minutes=10), pre_sent_at=now - timedelta(minutes=1))
+        self.assertFalse(is_pre_due(r, now, 15))
+
+    # ---- ежедневное ----
+    def test_daily_within_window(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        self.assertTrue(is_pre_due(self._daily(time(9, 15)), now, 15))
+
+    def test_daily_before_window(self):
+        now = datetime(2026, 10, 20, 8, 50, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._daily(time(9, 15)), now, 15))
+
+    def test_daily_after_time_not_pre_due(self):
+        # бот «догнал» после момента — предупреждение пропускается, остаётся основное
+        now = datetime(2026, 10, 20, 9, 30, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._daily(time(9, 15)), now, 15))
+
+    def test_daily_already_pre_sent_same_day(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        r = self._daily(time(9, 15), pre_sent_at=now - timedelta(minutes=1))
+        self.assertFalse(is_pre_due(r, now, 15))
+
+    # ---- еженедельное / ежемесячное ----
+    def test_weekly_relevant_day(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        r = Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.WEEKLY,
+            time=time(9, 15), weekdays=[now.weekday()],
+        )
+        self.assertTrue(is_pre_due(r, now, 15))
+
+    def test_weekly_other_day(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        other = (now.weekday() + 1) % 7
+        r = Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.WEEKLY,
+            time=time(9, 15), weekdays=[other],
+        )
+        self.assertFalse(is_pre_due(r, now, 15))
+
+    def test_monthly_on_day(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        r = Reminder.objects.create(
+            user=self.user, text="t", kind=Reminder.Kind.MONTHLY,
+            time=time(9, 15), day_of_month=now.day,
+        )
+        self.assertTrue(is_pre_due(r, now, 15))
+
+    # ---- отключения ----
+    def test_zero_interval_disables(self):
+        now = datetime(2026, 10, 20, 12, 0, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._once(now + timedelta(minutes=5)), now, 0))
+
+    def test_inactive_not_pre_due(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._daily(time(9, 15), is_active=False), now, 15))
+
+    def test_deleted_not_pre_due(self):
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._daily(time(9, 15), is_deleted=True), now, 15))
+
+    def test_blocked_user_not_pre_due(self):
+        self.user.is_blocked = True
+        self.user.save()
+        now = datetime(2026, 10, 20, 9, 5, tzinfo=dt_timezone.utc)
+        self.assertFalse(is_pre_due(self._daily(time(9, 15)), now, 15))
+
+
+class EffectiveRemindBeforeTests(TestCase):
+    def setUp(self):
+        self.user = TelegramUser.objects.create(telegram_id=1, timezone="UTC", default_remind_before=15)
+
+    def _make(self, **kw):
+        return Reminder.objects.create(user=self.user, text="t", kind=Reminder.Kind.DAILY, time=time(9, 0), **kw)
+
+    def test_per_reminder_wins(self):
+        self.assertEqual(self._make(remind_before=30).effective_remind_before(), 30)
+
+    def test_falls_back_to_user_default(self):
+        self.assertEqual(self._make().effective_remind_before(), 15)
+
+    def test_user_default_changed(self):
+        self.user.default_remind_before = 60
+        self.user.save()
+        self.assertEqual(self._make().effective_remind_before(), 60)
+
+    def test_default_is_15(self):
+        user2 = TelegramUser.objects.create(telegram_id=2, timezone="UTC")
+        r = Reminder.objects.create(user=user2, text="t", kind=Reminder.Kind.DAILY, time=time(9, 0))
+        self.assertEqual(r.effective_remind_before(), 15)
+
+
+class HumanizeMinutesTests(TestCase):
+    def test_humanize(self):
+        self.assertEqual(humanize_minutes(0), "не напоминать заранее")
+        self.assertEqual(humanize_minutes(None), "не напоминать заранее")
+        self.assertEqual(humanize_minutes(5), "5 мин")
+        self.assertEqual(humanize_minutes(15), "15 мин")
+        self.assertEqual(humanize_minutes(60), "1 час")
+        self.assertEqual(humanize_minutes(90), "1 ч 30 мин")
+        self.assertEqual(humanize_minutes(120), "2 ч")
+        self.assertEqual(humanize_minutes(1440), "1 день")

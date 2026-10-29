@@ -18,12 +18,13 @@ from bot.keyboards.main import (
     TYPE_KB,
     confirm_keyboard,
     day_of_month_keyboard,
+    remind_before_keyboard,
     weekday_keyboard,
 )
 from bot.keyboards.time_picker import hours_keyboard, minutes_keyboard
 from bot.limits import acheck_limits
 from bot.states import CreateReminder
-from bot.utils import WEEKDAY_NAMES, local_now, occurrence_passed
+from bot.utils import WEEKDAY_NAMES, humanize_minutes, local_now, occurrence_passed
 from calendar_sync.sync import schedule_push
 from core.models import MAX_REMINDER_TEXT_LENGTH, Reminder, TelegramUser
 
@@ -128,15 +129,41 @@ async def back_to_hour(callback: CallbackQuery, state: FSMContext):
 
 
 @router.callback_query(CreateReminder.minute, F.data.startswith("time:m:"))
-async def pick_minute(callback: CallbackQuery, state: FSMContext):
+async def pick_minute(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
     minute = int(callback.data.split(":")[2])
-    data = await state.get_data()
     await state.update_data(minute=minute)
-    await state.set_state(CreateReminder.confirm)
+    await state.set_state(CreateReminder.remind_before)
     await callback.message.edit_text(
-        f"📝 Проверь напоминание:\n\n{_summary(data)}", reply_markup=confirm_keyboard()
+        "⏰ Напомнить заранее? Первое напоминание придёт за выбранное время до, "
+        "второе — в сам момент.",
+        reply_markup=remind_before_keyboard("rb:pick", db_user.default_remind_before, "back:minute"),
     )
     await callback.answer()
+
+
+# ---- предупреждение заранее (интервал) ----
+@router.callback_query(CreateReminder.remind_before, F.data.startswith("rb:pick:"))
+async def pick_remind_before(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
+    val = callback.data.split(":")[2]
+    remind_before = None if val == "default" else int(val)
+    await state.update_data(remind_before=remind_before)
+    await _show_confirm(callback, state, db_user)
+    await callback.answer()
+
+
+@router.callback_query(CreateReminder.remind_before, F.data == "back:minute")
+async def rb_back_to_minute(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(CreateReminder.minute)
+    await callback.message.edit_text("🕐 Выбери минуты:", reply_markup=minutes_keyboard())
+    await callback.answer()
+
+
+async def _show_confirm(callback: CallbackQuery, state: FSMContext, db_user: TelegramUser):
+    data = await state.get_data()
+    await state.set_state(CreateReminder.confirm)
+    await callback.message.edit_text(
+        f"📝 Проверь напоминание:\n\n{_summary(data, db_user)}", reply_markup=confirm_keyboard()
+    )
 
 
 # ---- частота ----
@@ -254,11 +281,13 @@ async def cancel(callback: CallbackQuery, state: FSMContext):
 
 
 # ---- helpers ----
-def _summary(data: dict) -> str:
+def _summary(data: dict, db_user: TelegramUser | None = None) -> str:
     text = escape(data.get("text", ""))
+    rb = data.get("remind_before")
+    rb_label = "по умолчанию" if rb is None else humanize_minutes(rb)
     if data.get("kind") == "once":
         h, m = data.get("hour", 0), data.get("minute", 0)
-        return f"⏰ {data.get('date')} в {h:02d}:{m:02d}\n📝 {text}"
+        return f"⏰ {data.get('date')} в {h:02d}:{m:02d}\n⏳ Предупредить: {rb_label}\n📝 {text}"
     freq = data.get("freq")
     h, m = data.get("hour", 0), data.get("minute", 0)
     if freq == "daily":
@@ -268,7 +297,7 @@ def _summary(data: dict) -> str:
         sched = f"🔁 Еженедельно ({days}) в {h:02d}:{m:02d}"
     else:
         sched = f"🔁 Ежемесячно ({data.get('day_of_month')}-го) в {h:02d}:{m:02d}"
-    return f"{sched}\n📝 {text}"
+    return f"{sched}\n⏳ Предупредить: {rb_label}\n📝 {text}"
 
 
 @sync_to_async
@@ -277,6 +306,7 @@ def _update_reminder(pk: int, data: dict):
     r = Reminder.objects.select_related("user").get(pk=pk)
     hour = data.get("hour", 0)
     minute = data.get("minute", 0)
+    r.remind_before = data.get("remind_before")
 
     if data.get("kind") == "once":
         local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
@@ -287,6 +317,7 @@ def _update_reminder(pk: int, data: dict):
         r.weekdays = []
         r.day_of_month = None
         r.last_sent_at = None
+        r.pre_sent_at = None
     else:
         r.kind = data["freq"]
         r.time = dt_time(hour=hour, minute=minute)
@@ -295,6 +326,7 @@ def _update_reminder(pk: int, data: dict):
         r.day_of_month = data.get("day_of_month")
         skip = occurrence_passed(r.kind, r.time, r.weekdays, r.day_of_month, r.user.timezone)
         r.last_sent_at = timezone.now() if skip else None
+        r.pre_sent_at = None
 
     r.is_active = True
     r.save()
@@ -306,6 +338,7 @@ def _create_reminder(user_pk: int, data: dict):
     text = data["text"]
     hour = data.get("hour", 0)
     minute = data.get("minute", 0)
+    remind_before = data.get("remind_before")
 
     if data.get("kind") == "once":
         local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
@@ -313,6 +346,7 @@ def _create_reminder(user_pk: int, data: dict):
         r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.ONCE,
             remind_at=aware.astimezone(dt_timezone.utc),
+            remind_before=remind_before,
         )
         return r.pk
 
@@ -326,15 +360,16 @@ def _create_reminder(user_pk: int, data: dict):
     if freq == "weekly":
         r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
-            weekdays=weekdays, last_sent_at=last_sent,
+            weekdays=weekdays, last_sent_at=last_sent, remind_before=remind_before,
         )
     elif freq == "monthly":
         r = Reminder.objects.create(
             user=user, text=text, kind=Reminder.Kind.MONTHLY, time=t,
-            day_of_month=dom, last_sent_at=last_sent,
+            day_of_month=dom, last_sent_at=last_sent, remind_before=remind_before,
         )
     else:
         r = Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.DAILY, time=t, last_sent_at=last_sent,
+            user=user, text=text, kind=Reminder.Kind.DAILY, time=t,
+            last_sent_at=last_sent, remind_before=remind_before,
         )
     return r.pk

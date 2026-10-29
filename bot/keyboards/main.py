@@ -6,7 +6,8 @@ MAIN_MENU = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="➕ Новое напоминание"), KeyboardButton(text="📋 Мои напоминания")],
         [KeyboardButton(text="🌍 Часовой пояс"), KeyboardButton(text="📅 Календари")],
-        [KeyboardButton(text="⭐ Премиум"), KeyboardButton(text="ℹ️ Помощь")],
+        [KeyboardButton(text="⚙️ Настройки"), KeyboardButton(text="⭐ Премиум")],
+        [KeyboardButton(text="ℹ️ Помощь")],
     ],
     resize_keyboard=True,
 )
@@ -72,5 +73,51 @@ def confirm_keyboard():
                 InlineKeyboardButton(text="✅ Создать", callback_data="confirm:yes"),
                 InlineKeyboardButton(text="❌ Отмена", callback_data="confirm:no"),
             ]
+        ]
+    )
+
+
+def remind_before_keyboard(
+    prefix: str,
+    default_minutes: int = 15,
+    back_callback: str | None = None,
+    show_default: bool = True,
+):
+    """Клавиатура выбора интервала предупреждения.
+
+    prefix — префикс callback_data для выбора (напр. "rb:pick", "rb:edit:123", "rb:global").
+    """
+    from bot.utils import PRESET_MINUTES, humanize_minutes
+
+    rows = []
+    if show_default:
+        rows.append(
+            [
+                InlineKeyboardButton(
+                    text=f"🔹 По умолчанию ({humanize_minutes(default_minutes)})",
+                    callback_data=f"{prefix}:default",
+                )
+            ]
+        )
+    for m in PRESET_MINUTES:
+        rows.append([InlineKeyboardButton(text=humanize_minutes(m), callback_data=f"{prefix}:{m}")])
+    rows.append([InlineKeyboardButton(text="❌ Не напоминать заранее", callback_data=f"{prefix}:0")])
+    nav = []
+    if back_callback:
+        nav.append(InlineKeyboardButton(text="◀ Назад", callback_data=back_callback))
+    nav.append(InlineKeyboardButton(text="❌ Отмена", callback_data="cancel"))
+    rows.append(nav)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+
+def settings_keyboard():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(
+                    text="⏰ Напомнить заранее (по умолчанию)",
+                    callback_data="settings:remind_before",
+                )
+            ],
         ]
     )

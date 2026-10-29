@@ -6,7 +6,16 @@ from aiogram.enums import ParseMode
 from aiogram.fsm.storage.memory import MemoryStorage
 from django.conf import settings
 
-from bot.handlers import calendars, create, edit, premium, reminders, start, timezone as tz_handlers
+from bot.handlers import (
+    calendars,
+    create,
+    edit,
+    premium,
+    reminders,
+    settings as settings_handlers,
+    start,
+    timezone as tz_handlers,
+)
 from bot.middlewares import UserMiddleware
 
 
@@ -24,6 +33,7 @@ def build_dispatcher():
     dp.include_router(reminders.router)
     dp.include_router(edit.router)
     dp.include_router(tz_handlers.router)
+    dp.include_router(settings_handlers.router)
     dp.include_router(premium.router)
     dp.include_router(calendars.router)
 
