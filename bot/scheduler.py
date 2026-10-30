@@ -11,10 +11,11 @@ from datetime import datetime, timedelta
 from html import escape
 from zoneinfo import ZoneInfo
 
+from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from asgiref.sync import sync_to_async
 from django.utils import timezone
 
-from bot.utils import humanize_minutes
+from bot.utils import extract_links, humanize_minutes
 from core.models import Reminder
 
 logger = logging.getLogger(__name__)
@@ -130,25 +131,55 @@ def _mark_pre_sent(pk: int):
     Reminder.objects.filter(pk=pk).update(pre_sent_at=timezone.now())
 
 
+def build_body(title: str, description: str) -> str:
+    """Текст напоминания: заголовок (жирным) + описание ниже (если есть)."""
+    parts = [f"<b>{escape(title)}</b>"]
+    if description:
+        parts.append(escape(description))
+    return "\n\n".join(parts)
+
+
+def links_keyboard(links: list[str]) -> InlineKeyboardMarkup | None:
+    """Инлайн-кнопки для ссылок из описания (не более 3 — ограничено в extract_links)."""
+    if not links:
+        return None
+    if len(links) == 1:
+        labels = ["🔗 Открыть ссылку"]
+    else:
+        labels = [f"🔗 Ссылка {i + 1}" for i in range(len(links))]
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=label, url=url)] for label, url in zip(labels, links)
+        ]
+    )
+
+
 def _split_chunks(text: str) -> list[str]:
-    escaped = escape(text)
-    return [escaped[i : i + TG_MAX_MESSAGE] for i in range(0, len(escaped), TG_MAX_MESSAGE)]
+    return [text[i : i + TG_MAX_MESSAGE] for i in range(0, len(text), TG_MAX_MESSAGE)]
 
 
-async def _send_chunks(bot, chat_id: int, text: str, first_prefix: str) -> None:
-    """Отправляет текст чанками по лимиту Telegram; префикс — только к первому чанку."""
-    chunks = _split_chunks(text)
+async def _send_reminder(bot, chat_id: int, title: str, description: str, prefix: str) -> None:
+    """Отправляет заголовок + описание (чанками по лимиту Telegram).
+
+    Если в описании есть ссылки — прикрепляет кнопки-ссылки к первому сообщению.
+    """
+    body = build_body(title, description)
+    kb = links_keyboard(extract_links(description or ""))
+    chunks = _split_chunks(body)
     for idx, chunk in enumerate(chunks):
-        msg = f"{first_prefix}{chunk}" if idx == 0 else chunk
-        await bot.send_message(chat_id, msg)
+        msg = f"{prefix}{chunk}" if idx == 0 else chunk
+        if idx == 0 and kb is not None:
+            await bot.send_message(chat_id, msg, reply_markup=kb)
+        else:
+            await bot.send_message(chat_id, msg)
 
 
-async def _send_long_text(bot, chat_id: int, text: str) -> None:
-    await _send_chunks(bot, chat_id, text, "🔔 Напоминание:\n\n")
+async def _send_long_text(bot, chat_id: int, r: Reminder) -> None:
+    await _send_reminder(bot, chat_id, r.text, r.description, "🔔 Напоминание:\n\n")
 
 
-async def _send_pre(bot, chat_id: int, text: str, minutes: int) -> None:
-    await _send_chunks(bot, chat_id, text, f"🔔 Напомню через {humanize_minutes(minutes)}:\n\n")
+async def _send_pre(bot, chat_id: int, r: Reminder, minutes: int) -> None:
+    await _send_reminder(bot, chat_id, r.text, r.description, f"🔔 Напомню через {humanize_minutes(minutes)}:\n\n")
 
 
 async def check_due_reminders(bot) -> int:
@@ -158,7 +189,7 @@ async def check_due_reminders(bot) -> int:
     # 1) предупреждения (за N минут до)
     for r, minutes in await _pre_due_reminders():
         try:
-            await _send_pre(bot, r.user.telegram_id, r.text, minutes)
+            await _send_pre(bot, r.user.telegram_id, r, minutes)
         except Exception as exc:  # noqa: BLE001 — fail-silent, не роняем планировщик
             logger.warning("Ошибка отправки предупреждения %s: %s", r.pk, exc)
         await _mark_pre_sent(r.pk)
@@ -167,7 +198,7 @@ async def check_due_reminders(bot) -> int:
     # 2) основные напоминания
     for r in await _due_reminders():
         try:
-            await _send_long_text(bot, r.user.telegram_id, r.text)
+            await _send_long_text(bot, r.user.telegram_id, r)
         except Exception as exc:  # noqa: BLE001 — fail-silent
             logger.warning("Ошибка отправки напоминания %s: %s", r.pk, exc)
         await _mark_sent(r.pk)

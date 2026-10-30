@@ -62,3 +62,32 @@ class ConvertTests(TestCase):
         apply_event(r, {"id": "x", "summary": "вокал", "start": start, "rrule": "FREQ=DAILY"})
         self.assertEqual(r.kind, Reminder.Kind.DAILY)
         self.assertEqual(r.time, time(20, 30))
+
+    def test_apply_event_pulls_description(self):
+        start = datetime(2026, 10, 22, 14, 30, tzinfo=ZoneInfo("Europe/Moscow"))
+        r = Reminder(user=self.user, text="", kind=Reminder.Kind.ONCE)
+        apply_event(
+            r,
+            {
+                "id": "x",
+                "summary": "созвон",
+                "description": "Ссылка: https://zoom.us/j/123",
+                "start": start,
+                "rrule": None,
+            },
+        )
+        self.assertEqual(r.description, "Ссылка: https://zoom.us/j/123")
+
+    def test_apply_event_no_description(self):
+        start = datetime(2026, 10, 22, 14, 30, tzinfo=ZoneInfo("Europe/Moscow"))
+        r = Reminder(user=self.user, text="", kind=Reminder.Kind.ONCE, description="старое")
+        apply_event(r, {"id": "x", "summary": "созвон", "start": start, "rrule": None})
+        self.assertEqual(r.description, "")
+
+    def test_reminder_to_event_description(self):
+        r = Reminder.objects.create(
+            user=self.user, text="тест", description="описание встречи",
+            kind=Reminder.Kind.DAILY, time=time(9, 0),
+        )
+        ev = reminder_to_event(r)
+        self.assertEqual(ev["description"], "описание встречи")

@@ -94,6 +94,7 @@ class GoogleCalendarProvider(CalendarProvider):
         return {
             "id": item["id"],
             "summary": item.get("summary", ""),
+            "description": item.get("description", ""),
             "start": datetime.fromisoformat(start_raw),
             "rrule": rrule,
         }
@@ -121,6 +122,7 @@ class GoogleCalendarProvider(CalendarProvider):
     def _to_google(event):
         body = {
             "summary": event["summary"],
+            "description": event.get("description", ""),
             "start": {"dateTime": _iso(event["start"]), "timeZone": event.get("timezone", "UTC")},
             "end": {"dateTime": _iso(event["end"]), "timeZone": event.get("timezone", "UTC")},
         }

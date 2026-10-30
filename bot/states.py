@@ -5,6 +5,7 @@ from aiogram.fsm.state import State, StatesGroup
 
 class CreateReminder(StatesGroup):
     text = State()
+    description = State()  # описание (опционально, ссылки на встречи и т.п.)
     type = State()
     date = State()  # для однократного — выбор даты
     hour = State()

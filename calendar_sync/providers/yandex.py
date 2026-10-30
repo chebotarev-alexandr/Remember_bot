@@ -101,6 +101,7 @@ class YandexCalendarProvider(CalendarProvider):
             if component is None:
                 return None
             summary = str(component.get("summary", ""))
+            description = str(component.get("description", "") or "")
             dtstart = component.get("dtstart")
             if dtstart is None:
                 return None
@@ -111,7 +112,13 @@ class YandexCalendarProvider(CalendarProvider):
             rrule_obj = component.get("rrule")
             if rrule_obj is not None:
                 rrule = _vrec_to_rrule_str(rrule_obj)
-            return {"id": str(ev.url), "summary": summary, "start": start, "rrule": rrule}
+            return {
+                "id": str(ev.url),
+                "summary": summary,
+                "description": description,
+                "start": start,
+                "rrule": rrule,
+            }
         except Exception:
             logger.exception("Ошибка разбора события CalDAV")
             return None
@@ -120,6 +127,7 @@ class YandexCalendarProvider(CalendarProvider):
         cal = self._calendar()
         ev = cal.add_event(
             summary=event["summary"],
+            description=event.get("description", ""),
             dtstart=event["start"],
             dtend=event["end"],
             rrule=_rrule_to_dict(event["rrule"]) if event.get("rrule") else None,
@@ -131,6 +139,9 @@ class YandexCalendarProvider(CalendarProvider):
         component = ev.icalendar_component
         component.pop("summary", None)
         component.add("summary", event["summary"])
+        component.pop("description", None)
+        if event.get("description"):
+            component.add("description", event["description"])
         component.pop("dtstart", None)
         component.add("dtstart", event["start"])
         component.pop("dtend", None)

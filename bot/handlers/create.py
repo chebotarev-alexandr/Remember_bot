@@ -13,6 +13,7 @@ from django.utils import timezone
 from bot.handlers.common import try_edit
 from bot.keyboards.calendar import calendar_keyboard
 from bot.keyboards.main import (
+    DESCRIPTION_SKIP_KB,
     FREQUENCY_KB,
     MAIN_MENU,
     TYPE_KB,
@@ -48,8 +49,29 @@ async def reminder_text(message: Message, state: FSMContext):
         )
         return
     await state.update_data(text=text)
+    await state.set_state(CreateReminder.description)
+    await message.answer(
+        "📄 Добавь описание — например, ссылку на встречу. "
+        "Если ссылок несколько, до трёх станут кнопками.\n\n"
+        "Или нажми «Пропустить»:",
+        reply_markup=DESCRIPTION_SKIP_KB,
+    )
+
+
+@router.message(CreateReminder.description, F.text)
+async def reminder_description(message: Message, state: FSMContext):
+    description = message.text.strip()
+    await state.update_data(description=description)
     await state.set_state(CreateReminder.type)
     await message.answer("Какое напоминание?", reply_markup=TYPE_KB)
+
+
+@router.callback_query(CreateReminder.description, F.data == "desc:skip")
+async def description_skip(callback: CallbackQuery, state: FSMContext):
+    await state.update_data(description="")
+    await state.set_state(CreateReminder.type)
+    await callback.message.edit_text("Какое напоминание?", reply_markup=TYPE_KB)
+    await callback.answer()
 
 
 # ---- выбор типа ----
@@ -283,21 +305,28 @@ async def cancel(callback: CallbackQuery, state: FSMContext):
 # ---- helpers ----
 def _summary(data: dict, db_user: TelegramUser | None = None) -> str:
     text = escape(data.get("text", ""))
+    desc = escape(data.get("description", "") or "")
     rb = data.get("remind_before")
     rb_label = "по умолчанию" if rb is None else humanize_minutes(rb)
     if data.get("kind") == "once":
         h, m = data.get("hour", 0), data.get("minute", 0)
-        return f"⏰ {data.get('date')} в {h:02d}:{m:02d}\n⏳ Предупредить: {rb_label}\n📝 {text}"
-    freq = data.get("freq")
-    h, m = data.get("hour", 0), data.get("minute", 0)
-    if freq == "daily":
-        sched = f"🔁 Ежедневно в {h:02d}:{m:02d}"
-    elif freq == "weekly":
-        days = ", ".join(WEEKDAY_NAMES[d] for d in sorted(data.get("weekdays", [])))
-        sched = f"🔁 Еженедельно ({days}) в {h:02d}:{m:02d}"
+        lines = [f"⏰ {data.get('date')} в {h:02d}:{m:02d}"]
     else:
-        sched = f"🔁 Ежемесячно ({data.get('day_of_month')}-го) в {h:02d}:{m:02d}"
-    return f"{sched}\n⏳ Предупредить: {rb_label}\n📝 {text}"
+        freq = data.get("freq")
+        h, m = data.get("hour", 0), data.get("minute", 0)
+        if freq == "daily":
+            sched = f"🔁 Ежедневно в {h:02d}:{m:02d}"
+        elif freq == "weekly":
+            days = ", ".join(WEEKDAY_NAMES[d] for d in sorted(data.get("weekdays", [])))
+            sched = f"🔁 Еженедельно ({days}) в {h:02d}:{m:02d}"
+        else:
+            sched = f"🔁 Ежемесячно ({data.get('day_of_month')}-го) в {h:02d}:{m:02d}"
+        lines = [sched]
+    lines.append(f"⏳ Предупредить: {rb_label}")
+    lines.append(f"📝 {text}")
+    if desc:
+        lines.append(f"📄 {desc[:300]}")
+    return "\n".join(lines)
 
 
 @sync_to_async
@@ -307,6 +336,8 @@ def _update_reminder(pk: int, data: dict):
     hour = data.get("hour", 0)
     minute = data.get("minute", 0)
     r.remind_before = data.get("remind_before")
+    if "description" in data:
+        r.description = data.get("description", "")
 
     if data.get("kind") == "once":
         local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
@@ -336,6 +367,7 @@ def _update_reminder(pk: int, data: dict):
 def _create_reminder(user_pk: int, data: dict):
     user = TelegramUser.objects.get(pk=user_pk)
     text = data["text"]
+    description = data.get("description", "")
     hour = data.get("hour", 0)
     minute = data.get("minute", 0)
     remind_before = data.get("remind_before")
@@ -344,7 +376,7 @@ def _create_reminder(user_pk: int, data: dict):
         local = datetime.strptime(f"{data['date']} {hour:02d}:{minute:02d}", "%Y-%m-%d %H:%M")
         aware = local.replace(tzinfo=ZoneInfo(user.timezone or "UTC"))
         r = Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.ONCE,
+            user=user, text=text, description=description, kind=Reminder.Kind.ONCE,
             remind_at=aware.astimezone(dt_timezone.utc),
             remind_before=remind_before,
         )
@@ -359,17 +391,17 @@ def _create_reminder(user_pk: int, data: dict):
 
     if freq == "weekly":
         r = Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.WEEKLY, time=t,
+            user=user, text=text, description=description, kind=Reminder.Kind.WEEKLY, time=t,
             weekdays=weekdays, last_sent_at=last_sent, remind_before=remind_before,
         )
     elif freq == "monthly":
         r = Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.MONTHLY, time=t,
+            user=user, text=text, description=description, kind=Reminder.Kind.MONTHLY, time=t,
             day_of_month=dom, last_sent_at=last_sent, remind_before=remind_before,
         )
     else:
         r = Reminder.objects.create(
-            user=user, text=text, kind=Reminder.Kind.DAILY, time=t,
+            user=user, text=text, description=description, kind=Reminder.Kind.DAILY, time=t,
             last_sent_at=last_sent, remind_before=remind_before,
         )
     return r.pk

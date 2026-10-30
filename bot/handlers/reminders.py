@@ -116,8 +116,9 @@ async def rem_detail(callback: CallbackQuery):
         ]
     )
     status = "\n\n⏸ <b>На паузе</b>" if not r.is_active else ""
+    desc = f"\n\n📄 {escape(r.description)}" if r.description else ""
     await callback.message.edit_text(
-        f"📌 <b>{escape(r.text)}</b>\n\n{format_reminder(r)}{status}\n\nЧто сделать?",
+        f"📌 <b>{escape(r.text)}</b>{desc}\n\n{format_reminder(r)}{status}\n\nЧто сделать?",
         reply_markup=kb,
     )
     await callback.answer()
@@ -144,8 +145,9 @@ async def toggle_reminder(callback: CallbackQuery):
         ]
     )
     status = "\n\n⏸ <b>На паузе</b>" if not r.is_active else ""
+    desc = f"\n\n📄 {escape(r.description)}" if r.description else ""
     await callback.message.edit_text(
-        f"📌 <b>{escape(r.text)}</b>\n\n{format_reminder(r)}{status}\n\nЧто сделать?",
+        f"📌 <b>{escape(r.text)}</b>{desc}\n\n{format_reminder(r)}{status}\n\nЧто сделать?",
         reply_markup=kb,
     )
 

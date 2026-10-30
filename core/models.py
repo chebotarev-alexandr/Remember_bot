@@ -40,6 +40,7 @@ class Reminder(models.Model):
         TelegramUser, on_delete=models.CASCADE, related_name="reminders", verbose_name="Пользователь"
     )
     text = models.TextField("Текст")
+    description = models.TextField("Описание", blank=True, default="")
     kind = models.CharField("Тип", max_length=10, choices=Kind.choices)
 
     # Однократное — точный момент (aware, UTC)

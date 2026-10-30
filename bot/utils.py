@@ -1,5 +1,6 @@
 """Утилиты: часовые пояса и форматирование напоминаний."""
 
+import re
 from zoneinfo import ZoneInfo
 
 from core.models import Reminder
@@ -12,6 +13,33 @@ MONTH_NAMES = [
 
 # Предустановленные интервалы предупреждения (в минутах)
 PRESET_MINUTES = [5, 10, 15, 30, 60, 120, 1440]
+
+# URL в свободном тексте (Zoom, Google Meet, Telegram, plain http(s)…).
+_URL_RE = re.compile(r"https?://[^\s<>\"']+")
+
+
+def extract_links(text: str, max_links: int = 3) -> list[str]:
+    """Извлекает до max_links уникальных URL из текста (для кнопок-ссылок).
+
+    Обрезает хвостовую пунктуацию и несбалансированные закрывающие скобки —
+    чтобы ссылка «(https://zoom.us/j/123)» не забирала `)` в URL.
+    """
+    if not text:
+        return []
+    links: list[str] = []
+    seen: set[str] = set()
+    for match in _URL_RE.finditer(text):
+        url = match.group(0).rstrip(".,;:!?»")
+        while url.endswith(")") and url.count("(") < url.count(")"):
+            url = url[:-1]
+        url = url.rstrip(".,;:!?»")
+        if not url or url in seen:
+            continue
+        seen.add(url)
+        links.append(url)
+        if len(links) >= max_links:
+            break
+    return links
 
 
 def humanize_minutes(n: int | None) -> str:

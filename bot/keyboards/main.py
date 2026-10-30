@@ -20,6 +20,12 @@ TYPE_KB = InlineKeyboardMarkup(
     ]
 )
 
+DESCRIPTION_SKIP_KB = InlineKeyboardMarkup(
+    inline_keyboard=[
+        [InlineKeyboardButton(text="⏭ Пропустить", callback_data="desc:skip")],
+    ]
+)
+
 FREQUENCY_KB = InlineKeyboardMarkup(
     inline_keyboard=[
         [InlineKeyboardButton(text="📅 Ежедневно", callback_data="freq:daily")],

@@ -71,6 +71,7 @@ def reminder_to_event(reminder: Reminder) -> dict:
     end = start + timedelta(minutes=DEFAULT_DURATION_MINUTES)
     return {
         "summary": summary,
+        "description": reminder.description or "",
         "start": start,
         "end": end,
         "rrule": rrule,
@@ -85,6 +86,7 @@ def apply_event(reminder: Reminder, event: dict) -> None:
     rrule = (event.get("rrule") or "").upper()
 
     reminder.text = event["summary"]
+    reminder.description = event.get("description") or ""
 
     if not rrule:
         reminder.kind = Reminder.Kind.ONCE

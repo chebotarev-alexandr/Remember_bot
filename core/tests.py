@@ -8,8 +8,8 @@ from django.test import TestCase
 from django.utils import timezone
 
 from bot.limits import check_limits
-from bot.scheduler import is_due, is_pre_due
-from bot.utils import humanize_minutes
+from bot.scheduler import build_body, is_due, is_pre_due
+from bot.utils import extract_links, humanize_minutes
 from core.models import Reminder, TelegramUser
 
 
@@ -321,3 +321,47 @@ class HumanizeMinutesTests(TestCase):
         self.assertEqual(humanize_minutes(90), "1 ч 30 мин")
         self.assertEqual(humanize_minutes(120), "2 ч")
         self.assertEqual(humanize_minutes(1440), "1 день")
+
+
+class ExtractLinksTests(TestCase):
+    def test_no_links(self):
+        self.assertEqual(extract_links("просто текст без ссылок"), [])
+
+    def test_single_link(self):
+        self.assertEqual(extract_links("Созвон: https://zoom.us/j/123456"), ["https://zoom.us/j/123456"])
+
+    def test_multiple_links(self):
+        text = "https://meet.google.com/abc и https://t.me/joinchat/xyz"
+        self.assertEqual(extract_links(text), ["https://meet.google.com/abc", "https://t.me/joinchat/xyz"])
+
+    def test_max_three(self):
+        text = "a https://a.com b https://b.com c https://c.com d https://d.com"
+        self.assertEqual(extract_links(text), ["https://a.com", "https://b.com", "https://c.com"])
+
+    def test_strips_trailing_punctuation(self):
+        self.assertEqual(extract_links("Ссылка: (https://zoom.us/j/1)."), ["https://zoom.us/j/1"])
+
+    def test_balanced_parens_kept(self):
+        # скобки сбалансированы — оставляем как есть (часть URL)
+        self.assertEqual(extract_links("https://a.com/x(y)"), ["https://a.com/x(y)"])
+
+    def test_dedupe(self):
+        self.assertEqual(extract_links("https://a.com и ещё https://a.com"), ["https://a.com"])
+
+    def test_empty(self):
+        self.assertEqual(extract_links(""), [])
+
+
+class BuildBodyTests(TestCase):
+    def test_title_only(self):
+        self.assertEqual(build_body("Заголовок", ""), "<b>Заголовок</b>")
+
+    def test_title_and_description(self):
+        body = build_body("Заголовок", "Описание встречи")
+        self.assertIn("<b>Заголовок</b>", body)
+        self.assertIn("Описание встречи", body)
+
+    def test_escapes_html(self):
+        body = build_body("Заголовок <script>", "Описание & ссылка")
+        self.assertNotIn("<script>", body)
+        self.assertIn("&lt;script&gt;", body)
